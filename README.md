@@ -12,6 +12,7 @@ I tried several apps to connect to my car's OBD2 port. None of them worked prope
 - **Clear fault codes, like a garage tool.** Per ECU or all at once. After clearing it re-reads the memory and tells you if a fault comes straight back, which means the problem is still there.
 - **Safety checks.** It refuses to clear while the car is moving or the engine is running, warns about airbag and brake faults, and saves the fault list to a history before every clear.
 - **Live data.** Engine speed, temperatures, boost, airflow, EGR, fuel and more, with graphs and CSV export. Exhaust and DPF sensors are shown when the car provides them, with a warning when a sensor stays at zero or does not move.
+- **Power.** Estimates horsepower during an acceleration, with a power-by-rpm curve and a history of runs. It uses the engine torque when the car reports it, and otherwise the acceleration and the car's weight (power at the wheels).
 - **Vehicle info.** VIN, check-engine light, emissions readiness monitors, freeze frame, pending and permanent codes.
 - **Renault value finder.** A read-only tool that lists the manufacturer-specific values an ECU will give, then records which ones move, to find data that standard OBD does not expose.
 - **Console.** Every exchange with the adapter, shareable as a log for debugging.

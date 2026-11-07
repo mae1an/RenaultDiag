@@ -86,6 +86,34 @@ final class DecoderTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(PIDCatalog.pid(0xC1)?.value(from: [0x01, 0x0D, 0x48])), 300, accuracy: 0.001)
     }
 
+    func testPowerFromTorque() {
+        let kW = PowerMath.kilowatts(torque: 340, rpm: 3750)
+        XCTAssertEqual(kW, 133.5, accuracy: 0.1)
+        XCTAssertEqual(PowerMath.horsepower(kilowatts: kW), 181.5, accuracy: 0.2)
+    }
+
+    func testPowerFromAcceleration() throws {
+        // 2 m/s² from 60 km/h, read 8 times a second with whole km/h like real OBD.
+        var estimator = AccelerationPowerEstimator(massKg: 1700)
+        var power: Double?
+        for step in 0...12 {
+            let time = Double(step) / 8
+            let speed = (60 / 3.6 + 2 * time) * 3.6
+            power = estimator.add(speedKmh: speed.rounded(), at: time)
+        }
+        // Mean speed over the window about 18,5 m/s: inertia 63 kW, drag 3 kW, rolling 3,7 kW.
+        XCTAssertEqual(try XCTUnwrap(power), 70, accuracy: 4)
+    }
+
+    func testNoPowerWhileCruising() {
+        var estimator = AccelerationPowerEstimator(massKg: 1700)
+        var power: Double?
+        for step in 0...12 {
+            power = estimator.add(speedKmh: 90, at: Double(step) / 8)
+        }
+        XCTAssertNil(power)
+    }
+
     func testECUTableIsConsistent() {
         let uch = RenaultNetwork.allECUs.first { $0.address == "26" }
         XCTAssertEqual(uch?.tx, "745")

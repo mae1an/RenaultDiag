@@ -22,6 +22,13 @@ struct LiveView: View {
                 if model.isConnected {
                     ToolbarItem(placement: .topBarLeading) { recordButton }
                     ToolbarItem(placement: .topBarTrailing) {
+                        NavigationLink {
+                            PowerView()
+                        } label: {
+                            Label("Puissance", systemImage: "bolt.fill")
+                        }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
                         Button("Mesures", systemImage: "slider.horizontal.3") { isPickerShown = true }
                     }
                 }

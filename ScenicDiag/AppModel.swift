@@ -32,7 +32,7 @@ final class AppModel {
         case connected(AdapterInfo)
     }
 
-    private enum JobKind { case live, diagnostic }
+    private enum JobKind { case live, diagnostic, power }
 
     // Connection
     private(set) var connection: Connection = .disconnected
@@ -69,6 +69,16 @@ final class AppModel {
     private(set) var permanentDTCs: [DTC] = []
     private(set) var voltage: String?
     private(set) var isLoadingVehicle = false
+
+    // Power
+    private(set) var isPowerRunning = false
+    private(set) var powerMethod: PowerMethod?
+    private(set) var currentHP: Double?
+    private(set) var powerPoints: [PowerPoint] = []
+    private(set) var powerRuns: [PowerRun] = AppModel.loadPowerRuns()
+    var vehicleMassKg: Double = UserDefaults.standard.object(forKey: "vehicleMassKg") as? Double ?? 1700 {
+        didSet { UserDefaults.standard.set(vehicleMassKg, forKey: "vehicleMassKg") }
+    }
 
     // Discovery
     private(set) var explorerValues: [ECUValue] = []
@@ -421,6 +431,74 @@ final class AppModel {
             self?.pendingDTCs = pending
             self?.permanentDTCs = permanent
         }
+    }
+
+    // MARK: Power
+
+    /// Engine torque gives a real engine figure; acceleration only an estimate at the wheels.
+    var availablePowerMethod: PowerMethod {
+        supportedPIDs.contains(0x62) && supportedPIDs.contains(0x63) ? .torque : .acceleration
+    }
+
+    var bestHP: Double? { powerPoints.map(\.horsepower).max() }
+
+    func startPowerRun() {
+        guard let adapter else { return }
+        let method = availablePowerMethod
+        let massKg = vehicleMassKg
+        powerMethod = method
+        powerPoints = []
+        currentHP = nil
+        isPowerRunning = true
+        run(.power) { [weak self] in
+            defer { self?.finishPowerRun(method: method, massKg: massKg) }
+            try await adapter.useOBDAddressing()
+            let obd = OBDService(adapter: adapter)
+            let start = Date()
+            var estimator = AccelerationPowerEstimator(massKg: massKg)
+            let referenceTorque = method == .torque ? try await obd.read(PIDCatalog.pid(0x63)!) : nil
+
+            while !Task.isCancelled {
+                guard let self else { return }
+                guard let rpm = try await obd.read(PIDCatalog.pid(0x0C)!) else { continue }
+                var kilowatts: Double?
+                switch method {
+                case .torque:
+                    if let reference = referenceTorque, let percent = try await obd.read(PIDCatalog.pid(0x62)!), percent > 0 {
+                        kilowatts = PowerMath.kilowatts(torque: reference * percent / 100, rpm: rpm)
+                    }
+                case .acceleration:
+                    if let speed = try await obd.read(PIDCatalog.pid(0x0D)!) {
+                        kilowatts = estimator.add(speedKmh: speed, at: Date().timeIntervalSince(start))
+                    }
+                }
+                let horsepower = kilowatts.map { PowerMath.horsepower(kilowatts: $0) }
+                self.currentHP = horsepower
+                if let horsepower {
+                    self.powerPoints.append(PowerPoint(rpm: rpm, horsepower: horsepower))
+                    if self.powerPoints.count > 600 { self.powerPoints.removeFirst() }
+                }
+            }
+        }
+    }
+
+    func stopPowerRun() {
+        if jobKind == .power { job?.cancel() }
+    }
+
+    private func finishPowerRun(method: PowerMethod, massKg: Double) {
+        isPowerRunning = false
+        currentHP = nil
+        guard let best = powerPoints.max(by: { $0.horsepower < $1.horsepower }) else { return }
+        powerRuns.insert(PowerRun(date: Date(), method: method, maxHP: best.horsepower, rpmAtMax: best.rpm, massKg: method == .acceleration ? massKg : nil), at: 0)
+        if let data = try? JSONEncoder().encode(powerRuns) {
+            UserDefaults.standard.set(data, forKey: "powerRuns")
+        }
+    }
+
+    private static func loadPowerRuns() -> [PowerRun] {
+        guard let data = UserDefaults.standard.data(forKey: "powerRuns") else { return [] }
+        return (try? JSONDecoder().decode([PowerRun].self, from: data)) ?? []
     }
 
     // MARK: Discovery

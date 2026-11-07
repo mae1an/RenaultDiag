@@ -150,7 +150,9 @@ public actor SimulatedCar: ELMLink {
         case 0x00: return [0x98, 0x3F, 0xB0, 0x13] // supported PIDs, plus continuation
         case 0x20: return [0x80, 0x0E, 0x00, 0x01]
         case 0x40: return [0x44, 0x00, 0x00, 0x01]
-        case 0x60: return [0x00, 0x00, 0x21, 0x50]
+        case 0x60: return [0x60, 0x00, 0x21, 0x50]
+        case 0x62: return byte(125 + (running ? 20 + wave * 70 : 0))
+        case 0x63: return word(360)
         case 0x51: return [0x04]
         case 0x73: return [0x01] + word((running ? 103 + wave * 25 : 101) * 100)
         case 0x78: // sensor 1 measures, sensor 2 is stuck at 0 °C, to show the alert

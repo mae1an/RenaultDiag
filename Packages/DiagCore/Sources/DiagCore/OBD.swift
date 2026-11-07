@@ -60,6 +60,7 @@ public enum PIDCatalog {
         PID(id: 0x05, name: "Température liquide", unit: "°C", range: -40...130, group: .engine) { $0[0] - 40 },
         PID(id: 0x5C, name: "Température huile", unit: "°C", range: -40...160, group: .engine) { $0[0] - 40 },
         PID(id: 0x0E, name: "Avance à l'allumage", unit: "°", range: -64...64, group: .engine) { $0[0] / 2 - 64 },
+        PID(id: 0x63, name: "Couple de référence", unit: "N·m", range: 0...1000, group: .engine) { word($0) },
         PID(id: 0x61, name: "Couple demandé", unit: "%", range: -125...125, group: .engine) { $0[0] - 125 },
         PID(id: 0x62, name: "Couple réel", unit: "%", range: -125...125, group: .engine) { $0[0] - 125 },
         PID(id: 0x1F, name: "Temps depuis démarrage", unit: "s", range: 0...7200, group: .engine) { word($0) },
